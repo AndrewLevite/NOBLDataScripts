@@ -405,18 +405,17 @@ matrix = Generate3dMatrixCBCT(dirname);
                     elseif viewType == 2
                         [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,slicenumber,:)), radius, Center(2), Center(1));
                         
+                        
                         avgStruct = [avgStruct, gsValues];
                         tempStruct = avgValue;
 
 
                     elseif viewType == 3
                         [avgValue,gsValues] = CircularAVG(squeeze(matrix(slicenumber,:,:)), radius, Center(2), Center(1));
-                        if isempty(avgStruct)
-                            avgStruct = zeros(count,length(gsValues));
-                        end
-
-                        avgStruct(slicenumber - mark1 + 1,:) = gsValues(1:lengthVar(2)-1);
+                        
+                        avgStruct = [avgStruct, gsValues];
                         tempStruct = avgValue;
+
                     end
                     
                     
@@ -432,19 +431,19 @@ matrix = Generate3dMatrixCBCT(dirname);
                 if calib == 1;
                     TV1 = totalValue;
                     PV1 = totalAverage;
-                    PV1std = STD;
+                    PV1std = STD(1);
                 elseif calib == 2;
                     TV2 = totalValue;
                     PV2 = totalAverage;
-                    PV2std = STD;
+                    PV2std = STD(1);
                 elseif calib == 3
                     TV3 = totalValue;
                     PV3 = totalAverage;
-                    PV3std = STD;
+                    PV3std = STD(1);
                 elseif calib == 4
                     TV4 = totalValue;
                     PV4= totalAverage;
-                    PV4std = STD;
+                    PV4std = STD(1);
                 end
             end
 
@@ -477,19 +476,28 @@ matrix = Generate3dMatrixCBCT(dirname);
             s1Hist.BinEdges = [0:5500];
             s1Hist.NumBins = 20
             title('Standard 1 Histogram')
+            size(TV1)
+            S1Data = [[PV1,PV1std],TV1];
+            S1Data = S1Data.';
+
+            
             
             subplot(4,1,3)
             s2Hist = histogram(TV2)
             s2Hist.BinEdges = [0:5500];
             s2Hist.NumBins = 20
             title('Standard 2 Histogram')
-            
+            S2Data = [[PV2,PV2std],TV2];
+            S2Data = S2Data.';
             
             subplot(4,1,4)
             s3Hist = histogram(TV3)
             s3Hist.BinEdges = [0:5500];
             s3Hist.NumBins = 20;
             title('Standard 3 Histogram')
+            S3Data = [[PV3,PV3std],TV3];
+            S3Data = S3Data.';
+            
             
             choice = questdlg('Use the linear or exponential fit for calibration?',' ', 'Linear', 'Exp','Cancel','Cancel');
             
@@ -500,6 +508,12 @@ matrix = Generate3dMatrixCBCT(dirname);
                 cd(firstDir)
                 calibratedDir = GenerateCalibratedDicoms(dirname,vol,"standard",RS_lin,RI_lin)
                 saveas(gcf,'CalibrationData.png')
+                %dlmwrite("RawDataStandard.csv",["S1","S2","S3"])
+                dlmwrite("RawDataStandard.csv",S1Data,'roffset',1,'coffset',0,'-append')
+                dlmwrite("RawDataStandard.csv",S2Data,'roffset',1,'coffset',1,'-append')
+                dlmwrite("RawDataStandard.csv",S3Data,'roffset',1,'coffset',2,'-append')
+
+                
             case 'Exp'                
 
                 vol = DICOM2VolumeCBCT(dirname);
