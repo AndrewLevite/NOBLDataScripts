@@ -1,3 +1,4 @@
+clear all
 [dirname] = uigetdir('*.csv','Please choose CSV directory');
 cd(dirname)
 [dirname] = uigetfile('*.csv','Please choose CSV directory');
@@ -55,7 +56,7 @@ mean(rescaleSlopeValues)
 std(rescaleSlopeValues)
 
 subplot(3,1,1)
-
+%{
 for i = [1:count]
 
     
@@ -67,7 +68,7 @@ for i = [1:count]
     
     
 end
-
+%}
 
 close(loadingbar)
 hold off
@@ -75,3 +76,18 @@ subplot(3,1,2)
 histogram(rescaleSlopeValues)
 subplot(3,1,3)
 histogram(rescaleInterceptValues)
+rescaleSlopeValues = rescaleSlopeValues.';
+rescaleInterceptValues = rescaleInterceptValues.';
+
+if size(rescaleSlopeValues) < size(rescaleInterceptValues)
+    count = size(rescaleSlopeValues)
+else
+    count = size(rescaleInterceptValues)
+end
+
+dataWrite = [rescaleSlopeValues,rescaleInterceptValues]
+
+dlmwrite("RS_LIN_VALS_test.csv",dataWrite,'roffset',1,'coffset',0,'-append');
+
+
+

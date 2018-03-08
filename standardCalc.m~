@@ -475,7 +475,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             subplot(4,1,2)
             s1Hist = histogram(TV1)
             s1Hist.BinEdges = [0:5500];
-            
+            s1Hist.NumBins = 20
             title('Standard 1 Histogram')
             size(TV1)
             S1Data = [[PV1,PV1std],TV1];
@@ -500,36 +500,20 @@ matrix = Generate3dMatrixCBCT(dirname);
             S3Data = S3Data.';
             
             
-            choice = questdlg('Use the linear or exponential fit for calibration?',' ', 'Linear','Cancel','Cancel');
+            choice = questdlg('Use the linear or exponential fit for calibration?',' ', 'Linear', 'Exp','Cancel','Cancel');
             
             switch choice     
             case 'Linear'
                 
-                %vol = DICOM2VolumeCBCT(dirname);
+                vol = DICOM2VolumeCBCT(dirname);
                 cd(firstDir)
-                %calibratedDir = GenerateCalibratedDicoms(dirname,vol,"standard",RS_lin,RI_lin)
-                
+                calibratedDir = GenerateCalibratedDicoms(dirname,vol,"standard",RS_lin,RI_lin)
                 saveas(gcf,'CalibrationData.png')
-               
-                
-                if length(S1Data) < length(S2Data)
-                    dataCatIndex = length(S1Data);
-                else
-                    dataCatIndex = length(S2Data);
-                end
-                
-                if length(S3Data) < dataCatIndex
-                    dataCatIndex = length(S3Data);
-                end
-                
-                SData = [S1Data(1:dataCatIndex), S2Data(1:dataCatIndex), S3Data(1:dataCatIndex)];
-                dlmwrite("RawDataStandard.csv",SData,'roffset',1,'coffset',0,'-append')
-                
                 %dlmwrite("RawDataStandard.csv",["S1","S2","S3"])
-                %dlmwrite("RawDataStandard.csv",S2Data,'roffset',1,'coffset',1,'-append')
-                %dlmwrite("RawDataStandard.csv",S3Data,'roffset',1,'coffset',2,'-append')
-                
-                GenerateRescaleDist(SData,HU1,HU2,HU3,dirname)
+                dlmwrite("RawDataStandard.csv",S1Data,'roffset',1,'coffset',0,'-append')
+                dlmwrite("RawDataStandard.csv",S2Data,'roffset',1,'coffset',1,'-append')
+                dlmwrite("RawDataStandard.csv",S3Data,'roffset',1,'coffset',2,'-append')
+
                 
             case 'Exp'                
 
@@ -777,15 +761,14 @@ matrix = Generate3dMatrixCBCT(dirname);
             totalAvgValues = [length(RS_Vals)];
             
             loadingbar = waitbar(0,'Running Sim...');
-            i = 0;
+            
             for rs_value_index = 1:length(RS_Vals)
                HUstruct = [];
                
                for structnumber = 1:length(struct)
-                   i = i+1;
-                   waitbar(i / (length(RS_Vals)*length(struct)))
+                   waitbar((rs_value_index + structnumber) / (rs_value_index*structnumber))
                    HUstruct(structnumber) = (RS_Vals(rs_value_index)*struct(structnumber))+RI_Vals(rs_value_index);
-                    
+
                end
 
                totalAvgValues(rs_value_index) = mean2(HUstruct);
@@ -794,15 +777,10 @@ matrix = Generate3dMatrixCBCT(dirname);
             plotfig = figure(3);
             figure(plotfig)
         
+            h = histogram(totalAvgValues)
 
-            totalAvgValues = totalAvgValues.';
-            
-            %dlmwrite("RawDataStandard.csv",["S1","S2","S3"])
-            dlmwrite("totalAvgValues.csv",totalAvgValues,'roffset',1,'coffset',0,'-append')
-
-
-            h1 = histogram(totalAvgValues)
-
+            h.BinEdges = [0:5500];
+            h.NumBins = 30;
             
             title('Dist. of Grayscale over Volume of Interest')
             
@@ -864,8 +842,7 @@ matrix = Generate3dMatrixCBCT(dirname);
 %% This function allows the user to switch the view between the calibrated and uncalibrated set of Dicome Files
     function switchImageSetStandardCal()
         cd(firstDir)
-        [dirname]=uigetdir('Please choose dicom directory');
-        matrix = Generate3dMatrixCBCT(dirname);
+        matrix = Generate3dMatrixCBCT(uigetdir('Please choose dicom directory'));
         updateImage()
        
     end
