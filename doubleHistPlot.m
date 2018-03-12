@@ -6,11 +6,11 @@ cd(dirname)
 M = csvread(dirname);
 
 SC1 = M(1:end,1);
-SC2 = M(1:end,2);
-SC3 = M(1:end,3);
+SC2 = M(1:end,3);
+SC3 = M(1:end,5);
 
-SB1 = M(1:end,4);
-SB2 = M(1:end,5);
+SB1 = M(1:end,2);
+SB2 = M(1:end,4);
 SB3 = M(1:end,6);
 
 

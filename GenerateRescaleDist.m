@@ -9,14 +9,14 @@ function GenerateRescaleDist(vol,HU1,HU2,HU3,dirname)
     S2Dist = fitdist(S2, 'Normal');
     S3Dist = fitdist(S3, 'Normal');
 
-    count = 10000;
+    count = 100000;
     rescaleSlopeValues = [count];
     rescaleInterceptValues = [count];
     dmatValues = zeros(count,3);
     f = figure(4);
 
     loadingbar = waitbar(0,'Running Sim...');
-    for i = [1:count]
+    parfor i = [1:count]
 
         waitbar(i / count)
         S1Rand = random(S1Dist);

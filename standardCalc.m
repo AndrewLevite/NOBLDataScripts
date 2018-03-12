@@ -325,19 +325,26 @@ matrix = Generate3dMatrixCBCT(dirname);
                 return   
             end
             
+            %Verifies correct order for first and second marks
             if(mark1>mark2)
                 tempVar = mark1;
                 mark1=mark2;
                 mark2 = tempVar;
             end
             
+            %Switches between first and last slice, allowing using to
+            %select center of stanadard ROI. Prompts user for center of ROI
+            %after slice has been displayed.
             viewMark1();
             CenterM1 = ginput(1);
             viewMark2()
             CenterM2 = ginput(1);
             
+            %Prompts user to enter radius to be used for RoI
             radius = input('Please specify what radius you would like to use\n');
             
+            %Calculates center of RoI for each slice between first and last
+            %slice based on simple y = mx+b formula.
             deltay = double(CenterM2(2))-double(CenterM1(2))
             deltax = double(CenterM2(1))-double(CenterM1(1))
             deltaz = mark2 - mark1
@@ -376,6 +383,8 @@ matrix = Generate3dMatrixCBCT(dirname);
                 count = int16(mark2-mark1);
                 struct1 = size(matrix);
                 
+                %Creates appropriately sized array depending on the view of
+                %user selected view.
                 if viewType == 1
                     struct = zeros(count, struct1(1), struct1(2));
                 elseif viewType == 2 
@@ -387,7 +396,6 @@ matrix = Generate3dMatrixCBCT(dirname);
                 %Stores EVERY value calculated from standard.
                 avgStruct = []
                 
-                
                 %Iterates through each and calcuates the average GS values
                 %over area of interest
                 for slicenumber = mark1:mark2
@@ -396,30 +404,26 @@ matrix = Generate3dMatrixCBCT(dirname);
                     locationY = (double(slicenumber)*double(my))+by;
                     Center = [double(locationX), double(locationY)];
                   
-                    
+                    %Chooses appropriate slice depending on user view. 
                     if viewType == 1
                         [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,:,slicenumber)), radius, Center(2), Center(1));
-                        
                         avgStruct = [avgStruct, gsValues];
                         tempStruct = avgValue;
 
                     elseif viewType == 2
                         [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,slicenumber,:)), radius, Center(2), Center(1));
-                        
-                        
                         avgStruct = [avgStruct, gsValues];
                         tempStruct = avgValue;
 
 
                     elseif viewType == 3
                         [avgValue,gsValues] = CircularAVG(squeeze(matrix(slicenumber,:,:)), radius, Center(2), Center(1));
-                        
                         avgStruct = [avgStruct, gsValues];
                         tempStruct = avgValue;
 
                     end
                     
-                    
+                    %Stores avg value calucalted from slice
                     struct(slicenumber - mark1 + 1,:,:) = tempStruct;
                     
                     
@@ -429,6 +433,7 @@ matrix = Generate3dMatrixCBCT(dirname);
                 totalAverage = mean2(struct);
                 STD = std(double(struct));
               
+                %Generates statistics for each standard.
                 if calib == 1;
                     TV1 = totalValue;
                     PV1 = totalAverage;
@@ -452,6 +457,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             Dmat = [PV1; PV2; PV3; ];
             
             plotfig = figure(3);
+            
             %Here we are solving for the rescale coeff. using the average
             %PV. Below we will then use average PV values for each slice to
             %solve for the rescale coeff for each slice. 
@@ -459,19 +465,16 @@ matrix = Generate3dMatrixCBCT(dirname);
             f1 = fit(Dmat, HounsfieldUnitmat, 'exp1');
             RS_lin = rescale(1);
             RI_lin = rescale(2);
-            coeffa = f1.a;
-            coeffb = f1.b;
             fixHU_lin = (Dmat*RS_lin) +RI_lin;
-            fixHU_exp = coeffa*exp(coeffb*Dmat);
-            
+
             figure(plotfig)
             subplot(4,1,1)
             plot(Dmat, fixHU_lin, 'r--')
             hold on
-            plot(Dmat, fixHU_exp, 'b--')
             plot(Dmat, HounsfieldUnitmat, 'k+', 'MarkerSize', 15)
             hold off
             
+            %Histogram Visualization for each standard
             subplot(4,1,2)
             s1Hist = histogram(TV1)
             s1Hist.BinEdges = [0:5500];
@@ -480,13 +483,10 @@ matrix = Generate3dMatrixCBCT(dirname);
             size(TV1)
             S1Data = [[PV1,PV1std],TV1];
             S1Data = S1Data.';
-
-            
             
             subplot(4,1,3)
             s2Hist = histogram(TV2)
             s2Hist.BinEdges = [0:5500];
-            s2Hist.NumBins = 20
             title('Standard 2 Histogram')
             S2Data = [[PV2,PV2std],TV2];
             S2Data = S2Data.';
@@ -494,7 +494,6 @@ matrix = Generate3dMatrixCBCT(dirname);
             subplot(4,1,4)
             s3Hist = histogram(TV3)
             s3Hist.BinEdges = [0:5500];
-            s3Hist.NumBins = 20;
             title('Standard 3 Histogram')
             S3Data = [[PV3,PV3std],TV3];
             S3Data = S3Data.';
@@ -508,10 +507,70 @@ matrix = Generate3dMatrixCBCT(dirname);
                 %vol = DICOM2VolumeCBCT(dirname);
                 cd(firstDir)
                 %calibratedDir = GenerateCalibratedDicoms(dirname,vol,"standard",RS_lin,RI_lin)
-                
                 saveas(gcf,'CalibrationData.png')
-               
                 
+                %Remove data that is greater than 2-3 STD from the mean
+                mean = mean2(S1Data);
+                stddev = std(S1Data);
+                rmArray = [];
+                for i = 1:length(S1Data)
+                    
+                    if S1Data(i) < mean - (2 * stddev)
+                        rmArray=[rmArray,i];
+
+                    elseif S1Data(i) > mean + (2 * stddev)
+                        rmArray=[rmArray,i];
+                    else
+                        
+                    end
+                end
+                
+                for i = 1:length(rmArray)
+                    rmVal = rmArray(i);
+                    rmVal = rmVal - i + 1;
+                    S1Data(rmVal) = [];
+                end
+                
+                %Remove data that is greater than 2-3 STD from the mean
+                mean = mean2(S2Data);
+                stddev = std(S2Data);
+                rmArray = [];
+                for i = 1:length(S2Data)
+                    
+                    if S2Data(i) < mean - (2 * stddev)
+                        rmArray=[rmArray,i];
+                    elseif S2Data(i) > mean + (2 * stddev)
+                        rmArray=[rmArray,i];
+                    else
+                        
+                    end
+                end
+                for i = 1:length(rmArray)
+                    rmVal = rmArray(i);
+                    rmVal = rmVal - i + 1;
+                    S2Data(rmVal) = [];
+                end
+                %Remove data that is greater than 2-3 STD from the mean
+                mean = mean2(S3Data);
+                stddev = std(S3Data);
+                rmArray = [];
+                for i = 1:length(S3Data)
+                    
+                    if S3Data(i) < mean - (2 * stddev)
+                        rmArray=[rmArray,i];
+                    elseif S3Data(i) > mean + (2 * stddev)
+                        rmArray=[rmArray,i];
+                    else
+                        
+                    end
+                end
+                for i = 1:length(rmArray)
+                    rmVal = rmArray(i);
+                    rmVal = rmVal - i + 1;
+                    S3Data(rmVal) = [];
+                end    
+                %Ensures that each array has the same number of elements,
+                %length is choosen as smallest length of th setl
                 if length(S1Data) < length(S2Data)
                     dataCatIndex = length(S1Data);
                 else
@@ -522,21 +581,19 @@ matrix = Generate3dMatrixCBCT(dirname);
                     dataCatIndex = length(S3Data);
                 end
                 
+                %Array containing values for each standard in a different
+                %column. 
                 SData = [S1Data(1:dataCatIndex), S2Data(1:dataCatIndex), S3Data(1:dataCatIndex)];
+                
+                cd(dirname)
+                %Writes raw standard data as .csv file
                 dlmwrite("RawDataStandard.csv",SData,'roffset',1,'coffset',0,'-append')
-                
-                %dlmwrite("RawDataStandard.csv",["S1","S2","S3"])
-                %dlmwrite("RawDataStandard.csv",S2Data,'roffset',1,'coffset',1,'-append')
-                %dlmwrite("RawDataStandard.csv",S3Data,'roffset',1,'coffset',2,'-append')
-                
-                GenerateRescaleDist(SData,HU1,HU2,HU3,dirname)
-                
-            case 'Exp'                
-
-                vol = DICOM2VolumeCBCT(dirname);
                 cd(firstDir)
-                calibratedDir = GenerateCalibratedDicoms(dirname,vol,"standard",coeffa,coeffb)
-                saveas(gcf,'CalibrationData.png')
+                %Generates distribution of RS and RI values based on raw
+                %standard data. 
+                GenerateRescaleDist(SData,HU1,HU2,HU3,dirname)
+              
+            %Does nothing if calibration data is not sufficient.     
             case 'Cancel'
                 
             end
@@ -693,8 +750,8 @@ matrix = Generate3dMatrixCBCT(dirname);
             clear avgStruct
             [dirname] = uigetdir('*.csv','Please choose CSV directory');
             cd(dirname)
-            [dirname] = uigetfile('*.csv','Please choose CSV directory');
-            rs_ri_Vals = csvread(dirname);
+            [filename] = uigetfile('*.csv','Please choose CSV directory');
+            rs_ri_Vals = csvread(filename);
             
             RS_Vals = rs_ri_Vals(1:end,1);
             RI_Vals = rs_ri_Vals(1:end,2);
@@ -718,7 +775,6 @@ matrix = Generate3dMatrixCBCT(dirname);
             viewMark2()
             CenterM2 = ginput(1);
             
-            %radius = input('Please specify what radius you would like to use\n');
             radius = input('Please specify what radius you want to start with\n');
             
             deltay = double(CenterM2(2))-double(CenterM1(2))
@@ -776,14 +832,12 @@ matrix = Generate3dMatrixCBCT(dirname);
 
             totalAvgValues = [length(RS_Vals)];
             
-            loadingbar = waitbar(0,'Running Sim...');
-            i = 0;
-            for rs_value_index = 1:length(RS_Vals)
+
+            parfor rs_value_index = 1:length(RS_Vals)
                HUstruct = [];
                
                for structnumber = 1:length(struct)
-                   i = i+1;
-                   waitbar(i / (length(RS_Vals)*length(struct)))
+                   
                    HUstruct(structnumber) = (RS_Vals(rs_value_index)*struct(structnumber))+RI_Vals(rs_value_index);
                     
                end
@@ -798,15 +852,15 @@ matrix = Generate3dMatrixCBCT(dirname);
             totalAvgValues = totalAvgValues.';
             
             %dlmwrite("RawDataStandard.csv",["S1","S2","S3"])
+            cd(dirname)
+            
             dlmwrite("totalAvgValues.csv",totalAvgValues,'roffset',1,'coffset',0,'-append')
 
 
             h1 = histogram(totalAvgValues)
 
             
-            title('Dist. of Grayscale over Volume of Interest')
-            
-           
+           title('Dist. of Grayscale over Volume of Interest')
            
            avgStr = (strcat("Avg. HU: ", string(mean2(totalAvgValues))))
            stdStr = (strcat("Std. HU: ",string(std(double(totalAvgValues)))))
