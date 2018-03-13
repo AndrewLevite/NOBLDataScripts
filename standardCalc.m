@@ -313,8 +313,8 @@ matrix = Generate3dMatrixCBCT(dirname);
             HU1 = 2112;
             HU2 = 4301.6;
             HU3 = 6628.6;
-            %HU4 = 12012;
-
+            HU4 = 12012;
+            HU4 = nan;
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %ensures mark1 is less than mark2
             choice = questdlg('Verify you have selected first and last slice.',' ', 'OK','Cancel');
@@ -357,7 +357,15 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             %Iterates through each of the four standards, allowing the user
             %to select which standard they are calibrating.
-            for calib = [1:3]
+            
+            if ~isnan(HU4)
+                numCalib = 4;
+            else 
+                numCalib = 3;
+            end
+            
+            
+            for calib = [1:numCalib]
                 if calib > 1
                      
                     %msgbox(sprintf('Please indicate center of standard #%d',calib))
@@ -394,7 +402,7 @@ matrix = Generate3dMatrixCBCT(dirname);
                 end
                 
                 %Stores EVERY value calculated from standard.
-                avgStruct = []
+                avgStruct = [];
                 
                 %Iterates through each and calcuates the average GS values
                 %over area of interest
@@ -452,9 +460,17 @@ matrix = Generate3dMatrixCBCT(dirname);
                     PV4std = STD(1);
                 end
             end
+    
+            if ~isnan(HU4)
+                            
+                HounsfieldUnitmat = [HU1;HU2;HU3;HU4;];
+                Dmat = [PV1; PV2; PV3; PV4;];
+            else
+                HounsfieldUnitmat = [HU1;HU2;HU3;];
+                Dmat = [PV1; PV2; PV3;];
 
-            HounsfieldUnitmat = [HU1;HU2;HU3;];
-            Dmat = [PV1; PV2; PV3; ];
+            end
+
             
             plotfig = figure(3);
             
@@ -468,14 +484,14 @@ matrix = Generate3dMatrixCBCT(dirname);
             fixHU_lin = (Dmat*RS_lin) +RI_lin;
 
             figure(plotfig)
-            subplot(4,1,1)
+            subplot(5,1,1)
             plot(Dmat, fixHU_lin, 'r--')
             hold on
             plot(Dmat, HounsfieldUnitmat, 'k+', 'MarkerSize', 15)
             hold off
             
             %Histogram Visualization for each standard
-            subplot(4,1,2)
+            subplot(5,1,2)
             s1Hist = histogram(TV1)
             s1Hist.BinEdges = [0:5500];
             
@@ -484,20 +500,28 @@ matrix = Generate3dMatrixCBCT(dirname);
             S1Data = [[PV1,PV1std],TV1];
             S1Data = S1Data.';
             
-            subplot(4,1,3)
+            subplot(5,1,3)
             s2Hist = histogram(TV2)
             s2Hist.BinEdges = [0:5500];
             title('Standard 2 Histogram')
             S2Data = [[PV2,PV2std],TV2];
             S2Data = S2Data.';
             
-            subplot(4,1,4)
+            subplot(5,1,4)
             s3Hist = histogram(TV3)
             s3Hist.BinEdges = [0:5500];
             title('Standard 3 Histogram')
             S3Data = [[PV3,PV3std],TV3];
             S3Data = S3Data.';
             
+            if ~isnan(HU4)
+                subplot(5,1,5)
+                s3Hist = histogram(TV4)
+                s3Hist.BinEdges = [0:5500];
+                title('Standard 4 Histogram')
+                S4Data = [[PV4,PV4std],TV4];
+                S4Data = S4Data.';
+            end
             
             choice = questdlg('Use the linear or exponential fit for calibration?',' ', 'Linear','Cancel','Cancel');
             
@@ -509,16 +533,19 @@ matrix = Generate3dMatrixCBCT(dirname);
                 %calibratedDir = GenerateCalibratedDicoms(dirname,vol,"standard",RS_lin,RI_lin)
                 saveas(gcf,'CalibrationData.png')
                 
+                
                 %Remove data that is greater than 2-3 STD from the mean
+                threshVal = 1.5;
                 mean = mean2(S1Data);
                 stddev = std(S1Data);
                 rmArray = [];
+                
                 for i = 1:length(S1Data)
                     
-                    if S1Data(i) < mean - (2 * stddev)
+                    if S1Data(i) < mean - (threshVal * stddev)
                         rmArray=[rmArray,i];
 
-                    elseif S1Data(i) > mean + (2 * stddev)
+                    elseif S1Data(i) > mean + (threshVal * stddev)
                         rmArray=[rmArray,i];
                     else
                         
@@ -537,9 +564,9 @@ matrix = Generate3dMatrixCBCT(dirname);
                 rmArray = [];
                 for i = 1:length(S2Data)
                     
-                    if S2Data(i) < mean - (2 * stddev)
+                    if S2Data(i) < mean - (threshVal * stddev)
                         rmArray=[rmArray,i];
-                    elseif S2Data(i) > mean + (2 * stddev)
+                    elseif S2Data(i) > mean + (threshVal * stddev)
                         rmArray=[rmArray,i];
                     else
                         
@@ -556,9 +583,9 @@ matrix = Generate3dMatrixCBCT(dirname);
                 rmArray = [];
                 for i = 1:length(S3Data)
                     
-                    if S3Data(i) < mean - (2 * stddev)
+                    if S3Data(i) < mean - (threshVal * stddev)
                         rmArray=[rmArray,i];
-                    elseif S3Data(i) > mean + (2 * stddev)
+                    elseif S3Data(i) > mean + (threshVal * stddev)
                         rmArray=[rmArray,i];
                     else
                         
@@ -568,7 +595,29 @@ matrix = Generate3dMatrixCBCT(dirname);
                     rmVal = rmArray(i);
                     rmVal = rmVal - i + 1;
                     S3Data(rmVal) = [];
-                end    
+                end
+                
+                if ~isnan(HU4)
+                    %Remove data that is greater than 2-3 STD from the mean
+                    mean = mean2(S4Data);
+                    stddev = std(S4Data);
+                    rmArray = [];
+                    for i = 1:length(S4Data)
+
+                        if S4Data(i) < mean - (threshVal * stddev)
+                            rmArray=[rmArray,i];
+                        elseif S4Data(i) > mean + (threshVal * stddev)
+                            rmArray=[rmArray,i];
+                        else
+
+                        end
+                    end
+                    for i = 1:length(rmArray)
+                        rmVal = rmArray(i);
+                        rmVal = rmVal - i + 1;
+                        S4Data(rmVal) = [];
+                    end 
+                end
                 %Ensures that each array has the same number of elements,
                 %length is choosen as smallest length of th setl
                 if length(S1Data) < length(S2Data)
@@ -580,10 +629,18 @@ matrix = Generate3dMatrixCBCT(dirname);
                 if length(S3Data) < dataCatIndex
                     dataCatIndex = length(S3Data);
                 end
-                
+                if ~isnan(HU4)
+                    if length(S4Data) < dataCatIndex
+                        dataCatIndex = length(S4Data);
+                    end
+                end
                 %Array containing values for each standard in a different
                 %column. 
-                SData = [S1Data(1:dataCatIndex), S2Data(1:dataCatIndex), S3Data(1:dataCatIndex)];
+                if ~isnan(HU4)
+                    SData = [S1Data(1:dataCatIndex), S2Data(1:dataCatIndex), S3Data(1:dataCatIndex), S4Data(1:dataCatIndex)];
+                else
+                    SData = [S1Data(1:dataCatIndex), S2Data(1:dataCatIndex), S3Data(1:dataCatIndex)];
+                end
                 
                 cd(dirname)
                 %Writes raw standard data as .csv file
@@ -591,7 +648,7 @@ matrix = Generate3dMatrixCBCT(dirname);
                 cd(firstDir)
                 %Generates distribution of RS and RI values based on raw
                 %standard data. 
-                GenerateRescaleDist(SData,HU1,HU2,HU3,dirname)
+                GenerateRescaleDist(SData,HU1,HU2,HU3,HU4,dirname)
               
             %Does nothing if calibration data is not sufficient.     
             case 'Cancel'
