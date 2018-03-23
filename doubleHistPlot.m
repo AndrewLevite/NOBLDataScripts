@@ -20,21 +20,21 @@ histogram(SC1)
 hold on
 histogram(SB1)
 hold off
-title('Set 1 , Set 1 Histogram')
+title('Centered Set 1 , Buccal Set 1 Histogram')
 
 subplot(3,3,2)
 histogram(SC1)
 hold on
 histogram(SB2)
 hold off
-title('Set 1 , Set 2 Histogram')
+title('Centered Set 1 , Buccal Set 2 Histogram')
 
 subplot(3,3,3)
 histogram(SC1)
 hold on
 histogram(SB3)
 hold off
-title('Set 1 , Set 3 Histogram')
+title('Centered Set 1 , Buccal Set 3 Histogram')
 
 %%%%%
 
@@ -43,21 +43,21 @@ histogram(SC2)
 hold on
 histogram(SB1)
 hold off
-title('Set 2 , Set 1 Histogram')
+title('Centered Set 2 , Buccal Set 1 Histogram')
 
 subplot(3,3,5)
 histogram(SC2)
 hold on
 histogram(SB2)
 hold off
-title('Set 2 , Set 2 Histogram')
+title('Centered Set 2 , Buccal Set 2 Histogram')
 
 subplot(3,3,6)
 histogram(SC2)
 hold on
 histogram(SB3)
 hold off
-title('Set 2 , Set 3 Histogram')
+title('Centered Set 2 , Buccal Set 3 Histogram')
 
 %%%%
 
@@ -66,21 +66,21 @@ histogram(SC3)
 hold on
 histogram(SB1)
 hold off
-title('Set 3 , Set 1 Histogram')
+title('Centered Set 3 , Buccal Set 1 Histogram')
 
 subplot(3,3,8)
 histogram(SC3)
 hold on
 histogram(SB2)
 hold off
-title('Set 3 , Set 2 Histogram')
+title('Centered Set 3 , Buccal Set 2 Histogram')
 
 subplot(3,3,9)
 histogram(SC3)
 hold on
 histogram(SB3)
 hold off
-title('Set 3 , Set 3 Histogram')
+title('Centered Set 3 , Buccal Set 3 Histogram')
 
 
 

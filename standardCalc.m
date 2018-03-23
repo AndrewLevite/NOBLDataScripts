@@ -68,10 +68,6 @@ sliderPositon = 1;
 
 calibratedInView = false;
 uncalibratedDir = dirname;
-waterAirCalibratedDir = '?';
-standardCalibratedDir = '?';
-
-
 
 
 matrix = Generate3dMatrixCBCT(dirname);
@@ -186,6 +182,13 @@ matrix = Generate3dMatrixCBCT(dirname);
         %Seperates out subset of image set
         reducedMatrix = matrix(xmin:xmax,ymin:ymax,zmin:zmax);
         modelView(reducedMatrix)
+        
+    end
+
+%%% test threshholding funtion 
+    function threshholdAnalysisCallback(hObject,event)
+        
+        standardThreshHoldInit();
         
     end
 
@@ -944,6 +947,19 @@ matrix = Generate3dMatrixCBCT(dirname);
         
     end
 
+%%This function intializes standard threshholding analysis
+    function standardThreshHoldInit()
+        cd(firstDir)
+        if viewType == 1
+            standardThreshHold(squeeze(matrix(:,:,sliderPositon)));
+        elseif viewType == 2
+            standardThreshHold(squeeze(matrix(:,sliderPositon,:)));
+        elseif viewType == 3
+            standardThreshHold(squeeze(matrix(sliderPositon,:,:)));
+        else
+        end
+    end
+
 %% This function is used to view mark 1 when specific radius in calibration -- EL
     function viewMark1()
         n = mark1;
@@ -1002,7 +1018,7 @@ calibrateUsingStandards = uicontrol('Style', 'pushbutton', 'String', 'Calibrate 
 
 
 initRun = uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [81,14,420,20],'Callback', @(hObject, event) takeMeasurementCallback(hObject, event));
-switchView = uicontrol('Style', 'pushbutton', 'String', '3d View','Position', [81,54,420,20],'Callback', @(hObject, event) threeDimensionalAnalysisCallback(hObject, event));
+switchView = uicontrol('Style', 'pushbutton', 'String', 'Threshhold Test','Position', [81,54,420,20],'Callback', @(hObject, event) threshholdAnalysisCallback(hObject, event));
 
 imageSetChange = uicontrol('Style', 'pushbutton', 'String', 'Change Image Set','Position', [81,94,420,20],'Callback', @(hObject, event) switchImageSetStandardCal());
 getRadius = uicontrol('Style', 'pushbutton', 'String', 'Radius','Position', [81,74,420,20],'Callback', @(hObject, event) getradiusCallback(hObject, event));
