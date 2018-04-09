@@ -309,7 +309,6 @@ matrix = Generate3dMatrixCBCT(dirname);
     end
    
     %% Calibration using HA-HDPE Samples
-    
     function standardCalibration()
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%Values of EXPECTED standard values %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -353,11 +352,15 @@ matrix = Generate3dMatrixCBCT(dirname);
             CenterM1(1) = CenterM1(1) + CenterZoom(1)-viewLength;
             CenterM1(2) = CenterM1(2) + CenterZoom(2)-viewLength;
             
-            
+            %Switches between first and last slice, allowing using to
+            %select center of stanadard ROI. Prompts user for center of ROI
+            %after slice has been displayed.
             viewMark2()
             CenterZoom = ginput(1);
             displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,2);
             CenterM2 = ginput(1);
+            
+            %Pixel correction for X Y location selection 
             CenterM2(1) = CenterM2(1) + CenterZoom(1)-viewLength;
             CenterM2(2) = CenterM2(2) + CenterZoom(2)-viewLength;
             
@@ -369,27 +372,25 @@ matrix = Generate3dMatrixCBCT(dirname);
             deltay = double(CenterM2(2))-double(CenterM1(2))
             deltax = double(CenterM2(1))-double(CenterM1(1))
             deltaz = mark2 - mark1
-            
             my = double(deltay)/double(deltaz)
             by = double(CenterM1(2)) -double(my)*double(mark1)
-            
             mx = double(deltax)/double(deltaz)
             bx = double(CenterM1(1))- double(mx)*double(mark1)
             
             %Iterates through each of the four standards, allowing the user
             %to select which standard they are calibrating.
-            
             if ~isnan(HU4)
                 numCalib = 4;
             else 
                 numCalib = 3;
             end
             
-            
             for calib = [1:numCalib]
                 if calib > 1
-                     
-                    %msgbox(sprintf('Please indicate center of standard #%d',calib))
+                    
+                    %Switches between first and last slice, allowing using to
+                    %select center of stanadard ROI. Prompts user for center of ROI
+                    %after slice has been displayed.
                     viewMark1()
                     CenterZoom = ginput(1);
                     displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,1);
@@ -401,10 +402,10 @@ matrix = Generate3dMatrixCBCT(dirname);
                     displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,2);
                     CenterM2 = ginput(1);
                     CenterM2(1) = CenterM2(1) + CenterZoom(1)-viewLength;
-                    CenterM2(2) = CenterM2(2) + CenterZoom(2)-viewLength;
-                    %set(initRun, 'string', strcat('Center: ',num2str(cordinates)));
+                    CenterM2(2) = CenterM2(2) + CenterZoom(2)-viewLength;         
                     
-                    
+                    %Calculates center of RoI for each slice between first and last
+                    %slice based on simple y = mx+b formula.
                     deltay = double(CenterM2(2))-double(CenterM1(2))
                     deltaz = mark2 - mark1
                     my = double(deltay)/double(deltaz)
@@ -416,8 +417,9 @@ matrix = Generate3dMatrixCBCT(dirname);
                 
 
                 cd(firstDir)
-
+                %Defines the number of slices to be averaged
                 count = int16(mark2-mark1);
+                %Defines size of data to be collected
                 struct1 = size(matrix);
                 
                 %Creates appropriately sized array depending on the view of
@@ -830,7 +832,7 @@ matrix = Generate3dMatrixCBCT(dirname);
            label1 = uicontrol('Style', 'text','Parent', plotfig, 'String', stdStr,'Position',[100 50 100 32]);
           
     end
-%% Takes measurement based on current dataset
+%% Takes measurement based on current dataset, this function asks the user to specify a csv file with sets of rescale intercept and rescale slope values. This list can either be generated through the calibration function or can be specificed by the user.
     function takeMeasurementWithDist()
             
             clear avgStruct
