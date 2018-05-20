@@ -30,13 +30,11 @@ global coeffb
 %ginfo1 is used here to store the dicominfo information for each slice in
 %the Generate3dMatrix -- KV
 global ginfo1
-global convertedMatrix
 
 %Axis of view
 global viewType
 %Postion of slider viewer
 global sliderPositon
-
 
 mark1 = 1;
 mark2 = 1;
@@ -48,28 +46,13 @@ coeffb = [];
 coeffa = [];
 n = 1;
 
-convertedMatrix = 0;
 
-radius = 10;
-cordinates1 = 0;
 cordinates3 = 0;
-
 viewType = 1;
 sliderPositon = 1;
 
-%ginfo1 is used in regular generate3dMatrix, ginfo is used in
-%Generate3dMatrixbrandon
-%generate3dMatrix function is used for measurements, while
-%Generate3dMatrixbrandon is written for calibrations.
-%(Generate3dMatrixbrandon is name so because the code was written for
-%Brandon W. project) -- KV
+
 [dirname] = uigetdir('Please choose dicom directory');
-
-
-calibratedInView = false;
-uncalibratedDir = dirname;
-
-
 matrix = Generate3dMatrixCBCT(dirname);
 
 %% UI CALLBACKS %%%%%%%%%%
@@ -102,6 +85,12 @@ matrix = Generate3dMatrixCBCT(dirname);
 
 %%This function is the callback for running the "take measurement" routine.
     function takeMeasurementCallback(hObject, event)
+        %takeMeasurement()
+        takeMeasurement()
+        
+    end
+
+    function takeMeasurementWithDistCallback(hObject, event)
         %takeMeasurement()
         takeMeasurementWithDist()
         
@@ -193,9 +182,10 @@ matrix = Generate3dMatrixCBCT(dirname);
 
 
 %% Calculation and Calibration Functions
-%% Calibrate using Water / Air Standards
+%% Calibrate using Water / Air Standards. 
+%%!!!!NOT WORKING !!!!%%%%
     function waterAirCalibration()
-        
+            return
             cd(firstDir);
             
             cordinates = cordinates1;
@@ -303,12 +293,16 @@ matrix = Generate3dMatrixCBCT(dirname);
             case 'Perform Linear Fit'
                 calibratedDir = GenerateCalibratedDicoms(dirname,'WaterAir',RS_lin,RI_lin)
             case 'Cancel'
-                
+               
             end
            
     end
    
-    %% Calibration using HA-HDPE Samples
+    %% Calibration using HA-HDPE Samples. 
+    %Allows the user to create a set of rescale intercept and rescale slope
+    %pairs for later use. The user will enter the EXPECTED Hounsfield units
+    %of each of the standards, manually locate each standard and create a
+    %set of calibration curves using a guassian distribution. 
     function standardCalibration()
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%Values of EXPECTED standard values %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -689,11 +683,11 @@ matrix = Generate3dMatrixCBCT(dirname);
     end
 
 
-%% Takes measurement based on current dataset
+%% Takes measurement based on current dataset. Uses the rescale slope and
+%rescale intercept written into the dicom file. 
     function takeMeasurement()
             
             clear avgStruct
-            
             cd(firstDir)
             %ensures mark1 is before mark2
             if(mark1>mark2)
@@ -708,14 +702,41 @@ matrix = Generate3dMatrixCBCT(dirname);
             struct2 = [struct1(1), struct1(2)];
             m = 0;
             
-            viewMark1();
-            CenterM1 = ginput(1);
-            viewMark2()
-            CenterM2 = ginput(1);
+            %Defines the number of pixels that will be displayed after
+            %center of ROI is specified,
+            viewLength=15;
             
-            %radius = input('Please specify what radius you would like to use\n');
+            %Displays first mark defined by user.
+            viewMark1()
+            
+            %Askes user to specify center of ROI. First click will provide
+            %a zoomed area of the region, second click will allow the user
+            %to find the center of the image. Does the proper transforms
+            %for the image to convert from zoomed area to full area.
+            CenterZoom = ginput(1);
+            displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,1);
+            CenterM1 = ginput(1);
+            CenterM1(1) = CenterM1(1) + CenterZoom(1)-viewLength;
+            CenterM1(2) = CenterM1(2) + CenterZoom(2)-viewLength;
+            
+            %Displays second mark defined by user.
+            viewMark2()
+            %Askes user to specify center of ROI. First click will provide
+            %a zoomed area of the region, second click will allow the user
+            %to find the center of the image. Does the proper transforms
+            %for the image to convert from zoomed area to full area.
+            CenterZoom = ginput(1);
+            displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,2);
+            CenterM2 = ginput(1);
+            CenterM2(1) = CenterM2(1) + CenterZoom(1)-viewLength;
+            CenterM2(2) = CenterM2(2) + CenterZoom(2)-viewLength;
+            
+            %Alows users to specify the radius of the area of interest for
+            %averaging.
             radius = input('Please specify what radius you want to start with\n');
             
+            %Computes proper transforms for each slice. Simply y = mx+b
+            %from center of mark 1 to center of mark 2.
             deltay = double(CenterM2(2))-double(CenterM1(2))
             deltax = double(CenterM2(1))-double(CenterM1(1))
             deltaz = mark2 - mark1
@@ -731,13 +752,17 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             avgStruct = []    
             
+            %Iterates over each slice finding the average value of
+            %grayscale value value depending on user specificied view.
             for slicenumber = mark1:mark2
 
                 locationX = (double(slicenumber)*double(mx))+bx;
                 locationY = (double(slicenumber)*double(my))+by;
                 Center = [double(locationX), double(locationY)];
 
-                    
+                %Uses difference slice depending on user selected view.
+                %Takes a slice from the "matrix", provides x,y and R and
+                %calculates the average of the area.   
                 if viewType == 1
                     [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,:,slicenumber)), radius, Center(2), Center(1));
                     
@@ -747,21 +772,16 @@ matrix = Generate3dMatrixCBCT(dirname);
                     
                 elseif viewType == 2
                     [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,slicenumber,:)), radius, Center(2), Center(1));
-                    if isempty(avgStruct)
-                        avgStruct = zeros(count,length(gsValues));
-                    end
                     
-                    avgStruct(slicenumber - mark1 + 1,:) = gsValues(1:lengthVar(2)-1);
+                   
+                    avgStruct = [avgStruct, gsValues];
                     tempStruct = avgValue;
-                    
                     
                 elseif viewType == 3
                     [avgValue,gsValues] = CircularAVG(squeeze(matrix(slicenumber,:,:)), radius, Center(2), Center(1));
-                    if isempty(avgStruct)
-                        avgStruct = zeros(count,length(gsValues));
-                    end
                     
-                    avgStruct(slicenumber - mark1 + 1,:) = gsValues(1:lengthVar(2)-1);
+                   
+                    avgStruct = [avgStruct, gsValues];
                     tempStruct = avgValue;
                 end
                 
@@ -769,20 +789,21 @@ matrix = Generate3dMatrixCBCT(dirname);
                 
             end
             
+            %Plots data showing dist. of grayscale values. 
             plotfig = figure(3);
             figure(plotfig)
             subplot(3,1,1)
             size(avgStruct)
             h = histogram(avgStruct)
-
             h.BinEdges = [0:5500];
             h.NumBins = 10;
-            
             title('Dist. of Grayscale over Volume of Interest')
             subplot(3,1,2)
            
             HUstruct = [];
             
+            %Transforms each grayscale value based on rescale slope and
+            %rescale intercept of written into the dicom file.
             for structnumber = 1:length(struct)
                 rescaleint(structnumber)= ginfo1{structnumber-1+mark1}.RescaleIntercept;
                 rescaleslope(structnumber)= ginfo1{structnumber-1+mark1}.RescaleSlope;
@@ -792,13 +813,11 @@ matrix = Generate3dMatrixCBCT(dirname);
 
             end
             
-
            rangeofGSV = range(struct);
            rangeofHU = range(HUstruct);
-           
            xaxis = mark2-mark1+2;
 
-
+           %Flips axis based on ranges of HU and GS values. 
            if rangeofGSV>rangeofHU
                yaxismax = round(min(struct)+(rangeofGSV+(.5*rangeofGSV)));
                yaxismin = round(min(struct)-(.5*rangeofGSV));
@@ -832,15 +851,25 @@ matrix = Generate3dMatrixCBCT(dirname);
            label1 = uicontrol('Style', 'text','Parent', plotfig, 'String', stdStr,'Position',[100 50 100 32]);
           
     end
-%% Takes measurement based on current dataset, this function asks the user to specify a csv file with sets of rescale intercept and rescale slope values. This list can either be generated through the calibration function or can be specificed by the user.
+%% Takes measurement based on current dataset, this function asks the user 
+%to specify a csv file with sets of rescale intercept and rescale slope values. 
+%This list can either be generated through the calibration function or can 
+%be specificed by the user. This will end by generating a csv file with
+%every calculated housnfeild unit from the average grayscale value based on
+%supplied rs and ri values.
     function takeMeasurementWithDist()
             
             clear avgStruct
+            
+            %Askes the user to specifc the location of the CSV file
+            %containing the rescale slope and rescale intercept values.
             [dirname] = uigetdir('*.csv','Please choose CSV directory');
             cd(dirname)
             [filename] = uigetfile('*.csv','Please choose CSV directory');
             rs_ri_Vals = csvread(filename);
             
+            %Structs containing information regarding all of the rescale
+            %intercept and rescale values. 
             RS_Vals = rs_ri_Vals(1:end,1);
             RI_Vals = rs_ri_Vals(1:end,2);
             
@@ -858,22 +887,33 @@ matrix = Generate3dMatrixCBCT(dirname);
             struct2 = [struct1(1), struct1(2)];
             m = 0;
             
+            
+            %Defines the number of pixels that will be displayed after
+            %center of ROI is specified,
             viewLength=15;
+            
+            %Switches to first marked location.
             viewMark1()
+            %Transformation for zoom
             CenterZoom = ginput(1);
             displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,1);
             CenterM1 = ginput(1);
             CenterM1(1) = CenterM1(1) + CenterZoom(1)-viewLength;
             CenterM1(2) = CenterM1(2) + CenterZoom(2)-viewLength;
+            
+            %Switches to second marked location.
             viewMark2()
+            %Transformation for zoom
             CenterZoom = ginput(1);
             displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,2);
             CenterM2 = ginput(1);
             CenterM2(1) = CenterM2(1) + CenterZoom(1)-viewLength;
             CenterM2(2) = CenterM2(2) + CenterZoom(2)-viewLength;
 
+            %Prompts the user for a radius for area of interest.
             radius = input('Please specify what radius you want to start with\n');
             
+            %Calculates parameters for finding roi over each slice.
             deltay = double(CenterM2(2))-double(CenterM1(2))
             deltax = double(CenterM2(1))-double(CenterM1(1))
             deltaz = mark2 - mark1
@@ -889,32 +929,31 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             avgStruct = []  
     
+            %This loop iterates over each speccified slice (between Mark 1
+            %and Mark 2 inclusive) and calcuates the averageg grayscale
+            %value of the area. 
             for slicenumber = mark1:mark2
 
                 locationX = (double(slicenumber)*double(mx))+bx;
                 locationY = (double(slicenumber)*double(my))+by;
                 Center = [double(locationX), double(locationY)];
-
-
-                if viewType == 1
+            
+                %Uses difference slice depending on user selected view.
+                %Takes a slice from the "matrix", provides x,y and R and
+                %calculates the average of the area. 
+                if viewType == 1                    
                     [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,:,slicenumber)), radius, Center(2), Center(1));
-
-
                     avgStruct = [avgStruct, gsValues];
                     tempStruct = avgValue;
 
                 elseif viewType == 2
                     [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,slicenumber,:)), radius, Center(2), Center(1));
-
-
                     avgStruct = [avgStruct, gsValues];
                     tempStruct = avgValue;
 
 
                 elseif viewType == 3
                     [avgValue,gsValues] = CircularAVG(squeeze(matrix(:,slicenumber,:)), radius, Center(2), Center(1));
-
-
                     avgStruct = [avgStruct, gsValues];
                     tempStruct = avgValue;
                 end
@@ -923,12 +962,17 @@ matrix = Generate3dMatrixCBCT(dirname);
 
             end
 
+            %This struct contains the total number of average slice values.
+            %
             totalAvgValues = [length(RS_Vals)];
             
-
+            %This loop computes an equivelant hounsfeild unit for every
+            %rescale intercept and rescale slope supplied. This loop uses
+            %the parallel computing toolbox. The more cores your computer
+            %has the faster it goes.
             parfor rs_value_index = 1:length(RS_Vals)
+                
                HUstruct = [];
-               
                for structnumber = 1:length(struct)
                    
                    HUstruct(structnumber) = (RS_Vals(rs_value_index)*struct(structnumber))+RI_Vals(rs_value_index);
@@ -938,15 +982,15 @@ matrix = Generate3dMatrixCBCT(dirname);
                totalAvgValues(rs_value_index) = mean2(HUstruct);
 
             end
+            
             plotfig = figure(3);
             figure(plotfig)
-        
 
             totalAvgValues = totalAvgValues.';
-            
-            %dlmwrite("RawDataStandard.csv",["S1","S2","S3"])
+     
             cd(dirname)
             
+            %Wites a csv file with all calcuated hounsfeild units. 
             dlmwrite("totalAvgValuestest.csv",totalAvgValues,'roffset',1,'coffset',0,'-append')
 
 
@@ -967,13 +1011,13 @@ matrix = Generate3dMatrixCBCT(dirname);
         
         figure(f)
         if viewType == 1
-            imshow(squeeze(matrix(:,:,sliderPositon)),[1000,5000]);
+            imshow(squeeze(matrix(:,:,sliderPositon)),[]);
             drawnow;   
         elseif viewType == 2
-            imshow(squeeze(matrix(:,sliderPositon,:)),[1000,5000]);
+            imshow(squeeze(matrix(:,sliderPositon,:)),[]);
             drawnow;
         elseif viewType == 3
-            imshow(squeeze(matrix(sliderPositon,:,:)),[1000,5000]);
+            imshow(squeeze(matrix(sliderPositon,:,:)),[]);
             drawnow;
         else
         end
@@ -991,19 +1035,22 @@ matrix = Generate3dMatrixCBCT(dirname);
         
         figure(f)
         if viewType == 1
-            vol = squeeze(matrix(:,:,n));
+            vol = medfilt2(squeeze(matrix(:,:,n)));
             imageSubset = vol(y-viewLength:y+viewLength, x-viewLength:x+viewLength);
-            imshow(imageSubset,[]);
+            noisereduc = (imageSubset);
+            imshow(noisereduc,[1000,1200]);
             drawnow;   
         elseif viewType == 2
-            vol = squeeze(matrix(:,n,:));
+            vol = medfilt2(squeeze(matrix(:,n,:)));
             imageSubset = vol(y-viewLength:y+viewLength, x-viewLength:x+viewLength);
-            imshow(imageSubset,[]);
+            noisereduc = (imageSubset);
+            imshow(noisereduc,[1000,1200]);
             drawnow;
         elseif viewType == 3
-            vol = squeeze(matrix(n,:,:));
+            vol = medfilt2(squeeze(matrix(n,:,:)));
             imageSubset = vol(y-viewLength:y+viewLength, x-viewLength:x+viewLength);
-            imshow(imageSubset,[]);
+            noisereduc = (imageSubset);
+            imshow(noisereduc,[1000,1200]);
             drawnow;
         else
         end
@@ -1081,7 +1128,9 @@ calibrateUsingAirAndWater = uicontrol('Style', 'pushbutton', 'String', ' Calibra
 calibrateUsingStandards = uicontrol('Style', 'pushbutton', 'String', 'Calibrate using Standards','Position', [291,112,210,20], 'Callback', @(hObject, event) initStandardCalibrationCallback(hObject, event));
 
 
-initRun = uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [81,14,420,20],'Callback', @(hObject, event) takeMeasurementCallback(hObject, event));
+uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [81,14,420,20],'Callback', @(hObject, event) takeMeasurementWithDistCallback(hObject, event));
+uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [511,14,420,20],'Callback', @(hObject, event) takeMeasurementCallback(hObject, event));
+
 switchView = uicontrol('Style', 'pushbutton', 'String', 'Threshhold Test','Position', [81,54,420,20],'Callback', @(hObject, event) threshholdAnalysisCallback(hObject, event));
 
 imageSetChange = uicontrol('Style', 'pushbutton', 'String', 'Change Image Set','Position', [81,94,420,20],'Callback', @(hObject, event) switchImageSetStandardCal());
