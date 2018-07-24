@@ -1,6 +1,7 @@
+%% Last revised 07/05/18 - AL
+
 function standardCalc
-%To-do 1/25/2018: Define question how we want to relate the implant to 3d
-%model. Talk to andrew about getting image of implant...
+
 %This code actually changes the rescale slop and intercept for all slices.
 %-- KV
 clear global
@@ -53,7 +54,26 @@ sliderPositon = 1;
 
 
 [dirname] = uigetdir('Please choose dicom directory');
-matrix = Generate3dMatrixCBCT(dirname);
+filetype = questdlg('Have you used this set of DiCOM files before?', 'Choose One', 'Yes', 'No', 'Cancel');
+switch filetype
+    case 'Yes'
+        dataset = 2;
+    case 'No'
+        dataset = 1; 
+end
+
+if dataset == 1
+    matrix = Generate3dMatrixCBCT(dirname);
+    cd(dirname)
+    save('PVmatrix.mat','matrix')
+    save('ginfo.mat','ginfo1')
+elseif dataset == 2
+    cd(dirname)
+    load('PVmatrix.mat')
+    load('ginfo.mat')
+    
+end
+
 
 %% UI CALLBACKS %%%%%%%%%%
     %% This function dynamically switches to Axial view
@@ -83,7 +103,7 @@ matrix = Generate3dMatrixCBCT(dirname);
         updateImage();
     end
 
-%%This function is the callback for running the "take measurement" routine.
+%% This function is the callback for running the "take measurement" routine.
     function takeMeasurementCallback(hObject, event)
         %takeMeasurement()
         takeMeasurement()
@@ -96,12 +116,12 @@ matrix = Generate3dMatrixCBCT(dirname);
         
     end
 
-%%This function is the callback for running the water air calibration 
+%% This function is the callback for running the water air calibration 
     function initWaterAirCalibCallback(hObject,event)
         waterAirCalibration();
     end
 
-%%This function is the callback for running the standard calibration
+%% This function is the callback for running the standard calibration
 
     function initStandardCalibrationCallback(hObject,event)
         standardCalibration();
@@ -140,7 +160,7 @@ matrix = Generate3dMatrixCBCT(dirname);
         cordinates3 = ginput(1);
         xvalue = cordinates3(1)
         yvalue = cordinates3(2)
-        set(infobtn, 'string', strcat('X= ', num2str(xvalue), 'Y =',num2str(yvalue)))
+        set(mark2Center, 'string', strcat('X= ', num2str(xvalue), 'Y= ',num2str(yvalue)))
         
     end
 
@@ -312,7 +332,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             HU2 = 4301.6;
             HU3 = 6628.6;
             HU4 = 12012;
-            HU4 = nan;
+%             HU4 = nan;
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %ensures mark1 is less than mark2
             choice = questdlg('Verify you have selected first and last slice.',' ', 'OK','Cancel');
@@ -332,7 +352,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             %Number 1/2 width of box that will be shown when zooming in for
             %standard calibration
-            viewLength = 15;
+            viewLength = 20;
             
             %Switches between first and last slice, allowing using to
             %select center of stanadard ROI. Prompts user for center of ROI
@@ -385,6 +405,8 @@ matrix = Generate3dMatrixCBCT(dirname);
                     %Switches between first and last slice, allowing using to
                     %select center of stanadard ROI. Prompts user for center of ROI
                     %after slice has been displayed.
+                    msgbox(sprintf('Please indicate Mark1, Mark2 and center of standard #%d, then press the Enter key in the command window',calib))
+                    pause
                     viewMark1()
                     CenterZoom = ginput(1);
                     displayImageSubset(CenterZoom(1), CenterZoom(2),viewLength,1);
@@ -548,6 +570,13 @@ matrix = Generate3dMatrixCBCT(dirname);
                 S4Data = S4Data.';
             end
             
+            % Displays the mean and standard deviation of the GSV data
+            if ~isnan(HU4)
+                display = msgbox({['Mean 1 = ' num2str(mean2(TV1))]; ['Std 1 = ' num2str(std(double(TV1)))]; ['Mean 2 = ' num2str(mean2(TV2))]; ['Std 2 = ' num2str(std(double(TV2)))]; ['Mean 3 = ' num2str(mean2(TV3))]; ['Std 3 = ' num2str(std(double(TV3)))]; ['Mean 4 = ' num2str(mean2(TV4))]; ['Std 4 = ' num2str(std(double(TV4)))]});
+            else
+                display = msgbox({['Mean 1 = ' num2str(mean2(TV1))]; ['Std 1 = ' num2str(std(double(TV1)))]; ['Mean 2 = ' num2str(mean2(TV2))]; ['Std 2 = ' num2str(std(double(TV2)))]; ['Mean 3 = ' num2str(mean2(TV3))]; ['Std 3 = ' num2str(std(double(TV3)))]});
+            end
+            
             choice = questdlg('Use the linear or exponential fit for calibration?',' ', 'Linear','Cancel','Cancel');
             
             switch choice     
@@ -669,11 +698,13 @@ matrix = Generate3dMatrixCBCT(dirname);
                 
                 cd(dirname)
                 %Writes raw standard data as .csv file
-                dlmwrite("RawDataStandard.csv",SData,'roffset',1,'coffset',0,'-append')
+                dlmwrite('RawDataStandard.csv',SData,'roffset',1,'coffset',0,'-append')
                 cd(firstDir)
                 %Generates distribution of RS and RI values based on raw
                 %standard data. 
                 GenerateRescaleDist(SData,HU1,HU2,HU3,HU4,dirname)
+                
+                
               
             %Does nothing if calibration data is not sufficient.     
             case 'Cancel'
@@ -685,8 +716,7 @@ matrix = Generate3dMatrixCBCT(dirname);
 
 %% Takes measurement based on current dataset. Uses the rescale slope and
 %rescale intercept written into the dicom file. 
-    function takeMeasurement()
-            
+    function takeMeasurement(hObject, event)
             clear avgStruct
             cd(firstDir)
             %ensures mark1 is before mark2
@@ -704,7 +734,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             %Defines the number of pixels that will be displayed after
             %center of ROI is specified,
-            viewLength=15;
+            viewLength=20;
             
             %Displays first mark defined by user.
             viewMark1()
@@ -733,8 +763,25 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             %Alows users to specify the radius of the area of interest for
             %averaging.
-            radius = input('Please specify what radius you want to start with\n');
-            
+            prompt = {'Number of radii to evaluate:','Starting radius:','Ending Radius:'};
+                windowtitle = 'Evaluation parameters';
+                dims = [1 50];
+                definput = {'1','5','N/A'};
+                answer = inputdlg(prompt,windowtitle,dims,definput);
+            numbofradi = str2num(answer{1});
+            firstradius = str2num(answer{2});
+            lastradius = str2num(answer{3});
+            if ~isempty(lastradius)
+                delta = (lastradius - firstradius)/numbofradi;
+                radius = zeros(((lastradius-firstradius)/delta)+1,1);
+                tempradius = firstradius;
+                for i = 1:length(radius)
+                    radius(i) = tempradius; 
+                    tempradius = tempradius + delta;
+                end
+            else
+                radius = firstradius;
+            end            
             %Computes proper transforms for each slice. Simply y = mx+b
             %from center of mark 1 to center of mark 2.
             deltay = double(CenterM2(2))-double(CenterM1(2))
@@ -750,7 +797,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             m = m+1;
             matrixSize = size(matrix);
             
-            avgStruct = []    
+            avgStruct = [];   
             
             %Iterates over each slice finding the average value of
             %grayscale value value depending on user specificied view.
@@ -789,29 +836,43 @@ matrix = Generate3dMatrixCBCT(dirname);
                 
             end
             
-            %Plots data showing dist. of grayscale values. 
-            plotfig = figure(3);
-            figure(plotfig)
-            subplot(3,1,1)
-            size(avgStruct)
-            h = histogram(avgStruct)
-            h.BinEdges = [0:5500];
-            h.NumBins = 10;
-            title('Dist. of Grayscale over Volume of Interest')
-            subplot(3,1,2)
-           
-            HUstruct = [];
-            
-            %Transforms each grayscale value based on rescale slope and
-            %rescale intercept of written into the dicom file.
+            HUs = [];
             for structnumber = 1:length(struct)
                 rescaleint(structnumber)= ginfo1{structnumber-1+mark1}.RescaleIntercept;
                 rescaleslope(structnumber)= ginfo1{structnumber-1+mark1}.RescaleSlope;
                 struct = double(struct);
                 HUstruct(structnumber) = (rescaleslope(structnumber)*struct(structnumber))+rescaleint(structnumber);
-
-
             end
+            for i = 1:length(avgStruct)
+                tempHUs(i) = (rescaleslope(structnumber)*avgStruct(i))+rescaleint(structnumber);
+            end
+            HUs = [HUs tempHUs];
+        
+            %Plots data showing dist. of grayscale values. 
+            plotfig = figure(3);
+            figure(plotfig)
+            subplot(2,1,1)
+            h = histogram(avgStruct)
+            h.BinEdges = [min(avgStruct):min(avgStruct)+range(avgStruct)];
+            h.NumBins = 10;        
+            title('Dist. of Grayscale over Volume of Interest')
+            avgStr = (strcat('Avg. GSV: ', num2str(mean2(avgStruct))));
+            stdStr = (strcat('Std. GSV: ', num2str(std(double(avgStruct)))));
+            h = annotation('textbox',[0.58 0.75 0.1 0.1]);          
+            set(h,'String',{avgStr,stdStr});
+            subplot(2,1,2)
+            % Plots data showing distribution of HU values.
+            h = histogram(HUs)
+            h.BinEdges = [min(HUs):min(HUs)+range(HUs)]
+            h.NumBins = 10;
+            title('Dist. of HU over Volume of Interest')
+            
+            
+            %Transforms each grayscale value based on rescale slope and
+            %rescale intercept of written into the dicom file.
+            
+        
+            
             
            rangeofGSV = range(struct);
            rangeofHU = range(HUstruct);
@@ -830,11 +891,11 @@ matrix = Generate3dMatrixCBCT(dirname);
                axis([-1 150 yaxismin yaxismax])
            end 
            
-           
-           plot(HUstruct);
-           title('Avg HU Units versus Slice Number')
-           xlabel('Number of Slices')
-           ylabel('PV in HU')
+           % For analyzing HU as a function of slice number:
+%            plot(HUstruct);
+%            title('Avg HU Units versus Slice Number')
+%            xlabel('Number of Slices')
+%            ylabel('PV in HU')
 
            sixstruct = int16(struct);
            sixstruct = sixstruct +32767;
@@ -844,12 +905,12 @@ matrix = Generate3dMatrixCBCT(dirname);
            HU(m) = mean2(HUstruct)
            
            
-           avgStr = (strcat("Avg. HU: ", string(mean2(HUstruct))))
-           stdStr = (strcat("Std. HU: ",string(std(double(struct)))))
+           avgStr = (strcat('Avg. HU: ', string(mean2(HUs))))
+           stdStr = (strcat('Std. HU: ',string(std(double(avgStruct)))))
            
-           label2 = uicontrol('Style', 'text','Parent', plotfig, 'String', avgStr,'Position',[100 100 100 32]);
-           label1 = uicontrol('Style', 'text','Parent', plotfig, 'String', stdStr,'Position',[100 50 100 32]);
-          
+%            label2 = uicontrol('Style', 'text','Parent', plotfig, 'String', avgStr,'Position',[100 100 100 32]);
+%            label1 = uicontrol('Style', 'text','Parent', plotfig, 'String', stdStr,'Position',[100 50 100 32]);
+%           
     end
 %% Takes measurement based on current dataset, this function asks the user 
 %to specify a csv file with sets of rescale intercept and rescale slope values. 
@@ -890,7 +951,7 @@ matrix = Generate3dMatrixCBCT(dirname);
             
             %Defines the number of pixels that will be displayed after
             %center of ROI is specified,
-            viewLength=15;
+            viewLength=20;
             
             %Switches to first marked location.
             viewMark1()
@@ -983,7 +1044,7 @@ matrix = Generate3dMatrixCBCT(dirname);
 
             end
             
-            plotfig = figure(3);
+            plotfig = figure(5);
             figure(plotfig)
 
             totalAvgValues = totalAvgValues.';
@@ -991,16 +1052,19 @@ matrix = Generate3dMatrixCBCT(dirname);
             cd(dirname)
             
             %Wites a csv file with all calcuated hounsfeild units. 
-            dlmwrite("totalAvgValuestest.csv",totalAvgValues,'roffset',1,'coffset',0,'-append')
+            dlmwrite('totalAvgValuestest.csv',totalAvgValues,'roffset',1,'coffset',0,'-append')
 
 
             h1 = histogram(totalAvgValues)
-
-            
-           title('Dist. of Grayscale over Volume of Interest')
+            xlabel('HU');
+            ylabel('Count');
+            title('Dist. of HU over Volume of Interest')
+            avgStr = (strcat('Avg. HU: ', num2str(mean2(totalAvgValues))));
+            stdStr = (strcat('Std. HU: ', num2str(std(double(totalAvgValues)))));
+            h = annotation('textbox',[0.58 0.75 0.1 0.1]);          
+            set(h,'String',{avgStr,stdStr});
            
-           avgStr = (strcat("Avg. HU: ", string(mean2(totalAvgValues))))
-           stdStr = (strcat("Std. HU: ",string(std(double(totalAvgValues)))))
+           
            
            label2 = uicontrol('Style', 'text','Parent', plotfig, 'String', avgStr,'Position',[100 100 100 32]);
            label1 = uicontrol('Style', 'text','Parent', plotfig, 'String', stdStr,'Position',[100 50 100 32]);
@@ -1012,12 +1076,15 @@ matrix = Generate3dMatrixCBCT(dirname);
         figure(f)
         if viewType == 1
             imshow(squeeze(matrix(:,:,sliderPositon)),[]);
+            title(['Slice Number ' num2str(sliderPositon)])
             drawnow;   
         elseif viewType == 2
             imshow(squeeze(matrix(:,sliderPositon,:)),[]);
+            title(['Slice Number ' num2str(sliderPositon)])
             drawnow;
         elseif viewType == 3
             imshow(squeeze(matrix(sliderPositon,:,:)),[]);
+            title(['Slice Number ' num2str(sliderPositon)])
             drawnow;
         else
         end
@@ -1035,22 +1102,22 @@ matrix = Generate3dMatrixCBCT(dirname);
         
         figure(f)
         if viewType == 1
-            vol = medfilt2(squeeze(matrix(:,:,n)));
+            vol = squeeze(matrix(:,:,n));
             imageSubset = vol(y-viewLength:y+viewLength, x-viewLength:x+viewLength);
-            noisereduc = (imageSubset);
-            imshow(noisereduc,[1000,1200]);
+            noisereduc = imgaussfilt(imageSubset, 1);
+            imshow(noisereduc,[]);
             drawnow;   
         elseif viewType == 2
-            vol = medfilt2(squeeze(matrix(:,n,:)));
+            vol = squeeze(matrix(:,n,:));
             imageSubset = vol(y-viewLength:y+viewLength, x-viewLength:x+viewLength);
-            noisereduc = (imageSubset);
-            imshow(noisereduc,[1000,1200]);
+            noisereduc = imgaussfilt(imageSubset, 1);
+            imshow(noisereduc,[]);
             drawnow;
         elseif viewType == 3
-            vol = medfilt2(squeeze(matrix(n,:,:)));
+            vol = squeeze(matrix(n,:,:));
             imageSubset = vol(y-viewLength:y+viewLength, x-viewLength:x+viewLength);
-            noisereduc = (imageSubset);
-            imshow(noisereduc,[1000,1200]);
+            noisereduc = imgaussfilt(imageSubset, 1);
+            imshow(noisereduc,[]);
             drawnow;
         else
         end
@@ -1081,6 +1148,7 @@ matrix = Generate3dMatrixCBCT(dirname);
         elseif viewType == 3
             imshow(squeeze(matrix(n,:,:)),[]);
         end
+        title(['Slice Number ' num2str(sliderPositon)])
         drawnow;
     end
 
@@ -1094,6 +1162,7 @@ matrix = Generate3dMatrixCBCT(dirname);
         elseif viewType == 3
             imshow(squeeze(matrix(n,:,:)),[]);
         end
+        title(['Slice Number ' num2str(sliderPositon)])
         drawnow;
     end
 
@@ -1103,7 +1172,25 @@ matrix = Generate3dMatrixCBCT(dirname);
     function switchImageSetStandardCal()
         cd(firstDir)
         [dirname]=uigetdir('Please choose dicom directory');
-        matrix = Generate3dMatrixCBCT(dirname);
+        filetype = questdlg('Have you used this set of DiCOM files before?', 'Choose One', 'Yes', 'No', 'Cancel');
+        switch filetype
+            case 'Yes'
+                dataset = 2;
+            case 'No'
+                dataset = 1; 
+        end
+
+        if dataset == 1
+            matrix = Generate3dMatrixCBCT(dirname);
+            cd(dirname)
+            save('PVmatrix.mat','matrix')
+            save('ginfo.mat','ginfo1')
+        elseif dataset == 2
+            cd(dirname)
+            load('PVmatrix.mat')
+            load('ginfo.mat')
+
+        end
         updateImage()
        
     end
@@ -1113,35 +1200,39 @@ matrix = Generate3dMatrixCBCT(dirname);
 f=figure(1);
 
 %Slider to adjust view position.
-slider = uicontrol('Parent',f,'Style','slider','Position',[81,152,420,23],'min',0, 'max',size(matrix,3));
+slider = uicontrol('Parent',f,'Style','slider','Position',[81,650,420,40],'min',0, 'max',size(matrix,3), 'SliderStep', [1/size(matrix,3) 0.5]);
 
-btn1 = uicontrol('Style', 'pushbutton', 'String', 'Mark 1','Position', [81,34,210,20],'Callback', @(hObject, event) setmark1(hObject, event));
-btn2 = uicontrol('Style', 'pushbutton', 'String', 'Mark 2','Position', [291,34,210,20],'Callback', @(hObject, event) setmark2(hObject, event));
+btn1 = uicontrol('Style', 'pushbutton', 'String', 'Mark 1','Position', [81,370,210,40],'Callback', @(hObject, event) setmark1(hObject, event));
+btn2 = uicontrol('Style', 'pushbutton', 'String', 'Mark 2','Position', [291,370,210,40],'Callback', @(hObject, event) setmark2(hObject, event));
 
 %View Switcher Buttons
-viewSwitchAxial = uicontrol('Style', 'pushbutton', 'String', 'Axial View','Position', [81,132,140,20], 'Callback', @(hObject, event) switchViewAxialCallback(hObject, event));
-viewSwitchSagittal = uicontrol('Style', 'pushbutton', 'String', 'Sagittal View','Position', [221,132,140,20], 'Callback', @(hObject, event) switchViewSagittalCallback(hObject, event));
-viewSwitchCoronal = uicontrol('Style', 'pushbutton', 'String', 'Coronal View','Position', [361,132,140,20], 'Callback', @(hObject, event) switchViewCoronalCallback(hObject, event));
+viewSwitchAxial = uicontrol('Style', 'pushbutton', 'String', 'Axial View','Position', [81,610,140,40], 'Callback', @(hObject, event) switchViewAxialCallback(hObject, event));
+viewSwitchSagittal = uicontrol('Style', 'pushbutton', 'String', 'Sagittal View','Position', [221,610,140,40], 'Callback', @(hObject, event) switchViewSagittalCallback(hObject, event));
+viewSwitchCoronal = uicontrol('Style', 'pushbutton', 'String', 'Coronal View','Position', [361,610,140,40], 'Callback', @(hObject, event) switchViewCoronalCallback(hObject, event));
 
 %Calibration Buttons
-calibrateUsingAirAndWater = uicontrol('Style', 'pushbutton', 'String', ' Calibrate using Air and Water','Position', [81,112,210,20], 'Callback', @(hObject, event) initWaterAirCalibCallback(hObject, event));
-calibrateUsingStandards = uicontrol('Style', 'pushbutton', 'String', 'Calibrate using Standards','Position', [291,112,210,20], 'Callback', @(hObject, event) initStandardCalibrationCallback(hObject, event));
+calibrateUsingAirAndWater = uicontrol('Style', 'pushbutton', 'String', ' Calibrate using Air and Water','Position', [81,570,210,40], 'Callback', @(hObject, event) initWaterAirCalibCallback(hObject, event));
+calibrateUsingStandards = uicontrol('Style', 'pushbutton', 'String', 'Calibrate using Standards','Position', [291,570,210,40], 'Callback', @(hObject, event) initStandardCalibrationCallback(hObject, event));
 
 
-uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [81,14,420,20],'Callback', @(hObject, event) takeMeasurementWithDistCallback(hObject, event));
-uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [511,14,420,20],'Callback', @(hObject, event) takeMeasurementCallback(hObject, event));
+uicontrol('Style', 'pushbutton', 'String', 'Hounsfield Unit Measurement','Position', [81,14,420,40],'Callback', @(hObject, event) takeMeasurementWithDistCallback(hObject, event));
+uicontrol('Style', 'pushbutton', 'String', 'Take Measurement','Position', [511,14,420,40],'Callback', @(hObject, event) takeMeasurementCallback(hObject, event));
 
-switchView = uicontrol('Style', 'pushbutton', 'String', 'Threshhold Test','Position', [81,54,420,20],'Callback', @(hObject, event) threshholdAnalysisCallback(hObject, event));
+initRun = uicontrol('Style', 'pushbutton', 'String', 'Grayscale Value Measurement','Position', [81,330,420,40],'Callback', @(hObject, event) takeMeasurement(hObject, event));
+switchView = uicontrol('Style', 'pushbutton', 'String', 'Threshhold Test','Position', [81,410,420,40],'Callback', @(hObject, event) threshholdAnalysisCallback(hObject, event));
 
-imageSetChange = uicontrol('Style', 'pushbutton', 'String', 'Change Image Set','Position', [81,94,420,20],'Callback', @(hObject, event) switchImageSetStandardCal());
-getRadius = uicontrol('Style', 'pushbutton', 'String', 'Radius','Position', [81,74,420,20],'Callback', @(hObject, event) getradiusCallback(hObject, event));
+imageSetChange = uicontrol('Style', 'pushbutton', 'String', 'Change Image Set','Position', [81,530,420,40],'Callback', @(hObject, event) switchImageSetStandardCal());
+getRadius = uicontrol('Style', 'pushbutton', 'String', 'Radius','Position', [81,490,420,40],'Callback', @(hObject, event) getradiusCallback(hObject, event));
+mark2Center = uicontrol('Style', 'pushbutton', 'String', 'Select Pixel', 'Position', [81, 450, 420, 40], 'Callback', @(hObject, event) getpoint(hObject, event));
 
-mTextBox = uicontrol('style','text','Position', [81,0,420,14])
+mTextBox = uicontrol('style','text','Position', [81,290,420,40])
 
 addlistener(slider,'ContinuousValueChange',@(hObject, event) updateImageCallback(hObject, event));
 
+%dialogBox = ('Style', 
 %display%
-ax1=axes('parent',f,'position',[0.13 0.39  0.77 0.54]);
+ax1=axes('parent',f,'position',[0.2 0.1 0.8 0.8]);
+set(gcf, 'units', 'normalized', 'outerposition', [0 0 1 1]);
 imshow(squeeze(matrix(:,:,n)),[]);
 
 end
